@@ -15,6 +15,12 @@ import matplotlib.pyplot as plt
 data = pd.read_csv("insurance.csv")
 data = pd.get_dummies(data, columns=['region'], prefix='region', dtype=int)
 
+# droping duplicate values
+data.drop_duplicates(inplace=True)
+
+# remove extreme outliers
+data = data[(data['charges'] < 21000) & (data['bmi'] < 46)]
+
 label_encoder = LabelEncoder()
 data['smoker_encoded'] = label_encoder.fit_transform(data['smoker'])
 
@@ -59,7 +65,8 @@ def predict_charges():
     input_data = [[age, sex_encoded, bmi, children, smoker_encoded]]
     predicted_charge = gb_model.predict(input_data)[0]
 
-    result_label.config(text=f'Predicted Charges: ${predicted_charge:.2f}')
+    result_label.config(text=f'Suggested Premium: ${(predicted_charge):.2f} per year or ${(predicted_charge / 12):.2f} per month')
+    # result_label.config(text=f'Predicted Charges per year: ${(predicted_charge / age):.2f}')
 
 # Create the main window
 window = tk.Tk()
@@ -68,7 +75,7 @@ window.title("Insurance Charges Predictor")
 # Labels
 age_label = ttk.Label(window, text="Age:")
 bmi_label = ttk.Label(window, text="BMI:")
-children_label = ttk.Label(window, text="Number of Children:")
+children_label = ttk.Label(window, text="Dependants:")
 sex_label = ttk.Label(window, text="Sex:")
 smoker_label = ttk.Label(window, text="Smoker:")
 result_label = ttk.Label(window, text="Predicted Charges:")
