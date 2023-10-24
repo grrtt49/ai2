@@ -1,60 +1,104 @@
 import pandas as pd
-import numpy as np
+import tkinter as tk
+from tkinter import ttk
+from sklearn.preprocessing import LabelEncoder #for feature engineering 
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor 
+from sklearn.metrics import mean_squared_error, mean_absolute_error # for␣evaluating ml models
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
+import numpy as np
+import matplotlib.pyplot as plt
 
-# Load the CSV data
-data = pd.read_csv('claims_data.csv')
+data = pd.read_csv("insurance.csv")
+data = pd.get_dummies(data, columns=['region'], prefix='region', dtype=int)
 
-# Convert Date of Birth and Date of Service to datetime objects
-data['DOB'] = pd.to_datetime(data['DOB'])
-data['DOS'] = pd.to_datetime(data['DOS'])
+label_encoder = LabelEncoder()
+data['smoker_encoded'] = label_encoder.fit_transform(data['smoker'])
 
-# Encode categorical variables like Sex using one-hot encoding
-data = pd.get_dummies(data, columns=['SEX'])
+data['sex_encoded'] = label_encoder.fit_transform(data['sex'])
 
-# You may also want to extract features from the date, such as year, month, and day
-data['DOB_year'] = data['DOB'].dt.year
-data['DOB_month'] = data['DOB'].dt.month
-data['DOB_day'] = data['DOB'].dt.day
-data['DOS_year'] = data['DOS'].dt.year
-data['DOS_month'] = data['DOS'].dt.month
-data['DOS_day'] = data['DOS'].dt.day
+data = data[[x for x in data.columns if x not in ['smoker', 'sex']]]
 
-# Define the input features and target variable
-X = data[['DOB_year', 'DOB_month', 'DOB_day', 'DOS_year', 'DOS_month', 'DOS_day', 'SEX_F', 'SEX_M']]
-y = data['CLAIM']
+# Select the relevant features
+X = data[['age', 'sex_encoded', 'bmi', 'children', 'smoker_encoded']]
+y = data['charges']
 
-# Split the data into training and testing sets
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-model = tf.keras.Sequential([
-    tf.keras.layers.Dense(64, activation='relu', input_shape=(X_train.shape[1],)),
-    tf.keras.layers.Dense(32, activation='relu'),
-    tf.keras.layers.Dense(1, activation='sigmoid')  # Binary classification, so use 'sigmoid' activation
-])
+gb_model = GradientBoostingRegressor()
+gb_model.fit(X_train, y_train)
+gb_predictions = gb_model.predict(X_test)
+gb_mse = mean_squared_error(y_test, gb_predictions)
+gb_mae = mean_absolute_error(y_test, gb_predictions)
 
-model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+# Show how well the model works
+# plt.figure(figsize=(8, 4))
+# plt.scatter(y_test, gb_predictions, color='purple', label='Gradient Boosting')
+# plt.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], color='red', linestyle='--')
+# plt.title('Gradient Boosting: Actual vs. Predicted') 
+# plt.xlabel('Actual')
+# plt.ylabel('Predicted')
+# plt.legend()
+# plt.show()
 
-model.fit(X_train, y_train, epochs=10, batch_size=32, validation_data=(X_test, y_test))
 
-X_new = pd.DataFrame({
-    'DOB_year': [1990, 1985, 2000],
-    'DOB_month': [5, 8, 2],
-    'DOB_day': [15, 20, 10],
-    'DOS_year': [2023, 2023, 2023],
-    'DOS_month': [4, 7, 1],
-    'DOS_day': [10, 25, 5],
-    'SEX_F': [1, 0, 1],
-    'SEX_M': [0, 1, 0]
-})
+# Function to predict charges
+def predict_charges():
+    age = float(age_entry.get())
+    sex = sex_combobox.get()
+    bmi = float(bmi_entry.get())
+    children = int(children_entry.get())
+    smoker = smoker_combobox.get()
 
-# Make predictions on a new dataset (X_new)
-predictions = model.predict(X_new)
+    sex_encoded = 0 if sex == 'female' else 1
+    smoker_encoded = 1 if smoker == 'yes' else 0
 
-# You can set a threshold to classify claims as fraud or not
-threshold = 0.5
-fraudulent_claims = (predictions > threshold).astype(int)
+    input_data = [[age, sex_encoded, bmi, children, smoker_encoded]]
+    predicted_charge = gb_model.predict(input_data)[0]
 
-print(predictions)
-print(fraudulent_claims)
+    result_label.config(text=f'Predicted Charges: ${predicted_charge:.2f}')
+
+# Create the main window
+window = tk.Tk()
+window.title("Insurance Charges Predictor")
+
+# Labels
+age_label = ttk.Label(window, text="Age:")
+bmi_label = ttk.Label(window, text="BMI:")
+children_label = ttk.Label(window, text="Number of Children:")
+sex_label = ttk.Label(window, text="Sex:")
+smoker_label = ttk.Label(window, text="Smoker:")
+result_label = ttk.Label(window, text="Predicted Charges:")
+
+# Entry fields
+age_entry = ttk.Entry(window)
+bmi_entry = ttk.Entry(window)
+children_entry = ttk.Entry(window)
+
+# Comboboxes
+sex_combobox = ttk.Combobox(window, values=["male", "female"])
+sex_combobox.set("male")  # Default value
+smoker_combobox = ttk.Combobox(window, values=["yes", "no"])
+smoker_combobox.set("no")  # Default value
+
+# Predict button
+predict_button = ttk.Button(window, text="Predict", command=predict_charges)
+
+# Layout
+age_label.grid(row=0, column=0)
+age_entry.grid(row=0, column=1)
+sex_label.grid(row=1, column=0)
+sex_combobox.grid(row=1, column=1)
+bmi_label.grid(row=2, column=0)
+bmi_entry.grid(row=2, column=1)
+children_label.grid(row=3, column=0)
+children_entry.grid(row=3, column=1)
+smoker_label.grid(row=4, column=0)
+smoker_combobox.grid(row=4, column=1)
+predict_button.grid(row=5, columnspan=2)
+result_label.grid(row=6, columnspan=2)
+
+window.mainloop()
